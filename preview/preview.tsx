@@ -107,7 +107,7 @@ const hiddenStates: [string, PrResults][] = [
                         signedIn: false,
                         host: 'https://oauth.posthog.com',
                         signInError: popupMode === 'firefoxNeedsClient'
-                            ? 'Firefox needs a registered OAuth client for https://example.extensions.allizom.org/. Build with POSTHOG_OAUTH_CLIENT_ID set to that public client ID. See the Firefox setup in README.'
+                            ? 'Firefox needs a registered OAuth client for https://5ed7694585fc080f01fd256960c1126b795185f5.extensions.allizom.org/. Build with POSTHOG_OAUTH_CLIENT_ID set to that public client ID. See the Firefox setup in README.'
                             : undefined,
                     } }
                 case 'pr:results':

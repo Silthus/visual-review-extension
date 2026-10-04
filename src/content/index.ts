@@ -1,7 +1,7 @@
-import { extensionBrowser } from '../shared/browser'
 // Runs on every github.com page, so it stays tiny: parse the URL, check the repo index in
 // storage, and only load the sidebar module (React + hoggies) for a PR in a tracked repo.
 
+import { extensionBrowser } from '../shared/browser'
 import { parsePullRequestUrl } from '../shared/github'
 import { send } from '../shared/messages'
 import { lookupRepo, needsRefresh, repoIndexItem } from '../shared/repoIndex'

@@ -50,6 +50,8 @@ POSTHOG_OAUTH_CLIENT_ID='<registered public client_id>' pnpm build:firefox
 # Or use the same environment variable with pnpm zip:firefox / pnpm dev:firefox.
 ```
 
+Chrome builds always use the hosted first-party client.
+
 Reload the temporary add-on and select the same PostHog host in the popup. Registration belongs to that host; a client registered on a self-hosted instance cannot sign in through Cloud. The Cloud registration proxy registers the client in both Cloud regions.
 
 PostHog reserves client names that start with its brand, so the developer registration uses "Visual Review for Firefox".

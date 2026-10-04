@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { runInNewContext } from 'node:vm'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
 const chromeManifest = JSON.parse(readFileSync('src/manifest.json', 'utf8'))
@@ -30,4 +31,22 @@ it('preserves the Chrome identity and module worker in the default build', () =>
     expect(manifest.key).toBe(chromeManifest.key)
     expect(manifest.background).toEqual({ service_worker: 'background.js', type: 'module' })
     expect(manifest.browser_specific_settings).toBeUndefined()
+})
+
+it('keeps Chrome sign-in on its first-party client when Firefox setup is exported', async () => {
+    execFileSync('node', ['scripts/build.mjs'], { cwd: workspace, env: { ...process.env, POSTHOG_OAUTH_CLIENT_ID: 'firefox-only-client' } })
+    let respondToRequest
+    let authorization
+    const chrome = {
+        identity: {
+            getRedirectURL: () => 'https://coegljbgaffjilmoampifafjigkdmjaf.chromiumapp.org/',
+            launchWebAuthFlow: async ({ url }) => { authorization = new URL(url); return undefined },
+        },
+        storage: { local: { set: async () => undefined } },
+        runtime: { onMessage: { addListener: (listener) => { respondToRequest = listener } } },
+    }
+    runInNewContext(readFileSync(join(workspace, 'dist/background.js'), 'utf8'), { chrome, URL, URLSearchParams, crypto, TextEncoder, btoa })
+    await new Promise((resolve) => respondToRequest({ type: 'auth:signIn', host: 'https://oauth.posthog.com' }, {}, resolve))
+    expect(authorization.searchParams.get('client_id')).toBe('https://posthog.com/.well-known/oauth/visual-review/client-metadata.json')
+    expect(authorization.searchParams.get('redirect_uri')).toBe('https://coegljbgaffjilmoampifafjigkdmjaf.chromiumapp.org/')
 })

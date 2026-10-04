@@ -19,7 +19,7 @@ const shared = {
     jsx: 'automatic',
     define: {
         'process.env.NODE_ENV': JSON.stringify(watch ? 'development' : 'production'),
-        POSTHOG_OAUTH_CLIENT_ID: JSON.stringify(process.env.POSTHOG_OAUTH_CLIENT_ID || null),
+        POSTHOG_OAUTH_CLIENT_ID: JSON.stringify(browser === 'firefox' ? process.env.POSTHOG_OAUTH_CLIENT_ID || null : null),
     },
     // Stylesheets are injected as <style> text (the sidebar section lives in a shadow root).
     loader: { '.css': 'text' },
