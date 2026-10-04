@@ -63,13 +63,26 @@ const TEST_PATHS = [
     /(^|\/)test_[^/]+\.py$/,
     /_test\.py$/,
     /(^|\/)conftest\.py$/,
+    /(^|\/)tests\.py$/,
 ]
 
 export const HEADER_LINES = 40
 
-const COMMENT_START = /^\s*(\/\/+|\/\*+|\*+|#+|<!--|--)\s*/
-
 const GENERATED_MARKERS = [/^@generated\b/, /^Code generated .* DO NOT EDIT\.?/, /^This (file|code) (is|was) (auto-?generated|automatically generated)\b/i, /^(auto-?generated|automatically generated) (by|from|with)\b/i]
+
+const CODE_COMMENT_START = /^\s*(\/\/+|\/\*+|#+|<!--)\s*/
+
+const DASH_COMMENT_START = /^\s*(--+|\/\*+)\s*/
+
+const BLOCK_INTERIOR_START = /^\s*(\*+|\/\/+|#+)\s*/
+
+const DASH_COMMENTS = /\.(sql|lua|hs)$/i
+
+const MARKDOWN_COMMENT_START = /^\s*<!--\s*/
+
+const MARKDOWN = /\.(md|mdx|markdown)$/i
+
+const BLOCK_CLOSERS: Record<string, string> = { '/*': '*/', '<!--': '-->' }
 
 function fileName(path: string): string {
     return path.slice(path.lastIndexOf('/') + 1)
@@ -79,26 +92,26 @@ function isStandardArtifact(path: string): boolean {
     return LOCKFILES.has(fileName(path)) || GENERATED_PATHS.some((pattern) => pattern.test(path))
 }
 
-const BLOCK_CLOSERS: Record<string, string> = { '/*': '*/', '<!--': '-->' }
-
-const MARKDOWN = /\.(md|mdx|markdown)$/i
-
-function commentText(line: string): string | null {
-    const start = COMMENT_START.exec(line)
-    if (!start || hasCodeAfterInlineComment(line)) {
-        return null
-    }
-    return line.slice(start[0].length)
+function hasCodeAfter(line: string, closer: string, from: number): boolean {
+    const close = line.indexOf(closer, from)
+    return close >= 0 && line.slice(close + closer.length).trim() !== ''
 }
 
-function hasCodeAfterInlineComment(line: string): boolean {
+function openedBlock(line: string): { closer: string; closed: boolean; codeAfter: boolean } | null {
     const trimmed = line.trimStart()
     const opener = Object.keys(BLOCK_CLOSERS).find((open) => trimmed.startsWith(open))
     if (!opener) {
-        return false
+        return null
     }
-    const close = trimmed.indexOf(BLOCK_CLOSERS[opener]!, opener.length)
-    return close >= 0 && trimmed.slice(close + BLOCK_CLOSERS[opener]!.length).trim() !== ''
+    const closer = BLOCK_CLOSERS[opener]!
+    return { closer, closed: trimmed.includes(closer, opener.length), codeAfter: hasCodeAfter(trimmed, closer, opener.length) }
+}
+
+function commentSyntax(path: string): RegExp {
+    if (MARKDOWN.test(path)) {
+        return MARKDOWN_COMMENT_START
+    }
+    return DASH_COMMENTS.test(path) ? DASH_COMMENT_START : CODE_COMMENT_START
 }
 
 interface LeadingComments {
@@ -106,34 +119,31 @@ interface LeadingComments {
     complete: boolean
 }
 
-function blockCloser(line: string): string | null {
-    const opener = Object.keys(BLOCK_CLOSERS).find((open) => line.trimStart().startsWith(open))
-    const closer = opener ? BLOCK_CLOSERS[opener]! : null
-    return closer && !line.includes(closer, line.indexOf(opener!) + opener!.length) ? closer : null
-}
-
-function insideBlockText(line: string): string {
-    return commentText(line) ?? line.trim()
-}
-
-function leadingComments(fileHeader: string[]): LeadingComments {
+function leadingComments(fileHeader: string[], commentStart: RegExp): LeadingComments {
     const comments: string[] = []
-    let openBlock: string | null = null
+    let openCloser: string | null = null
+    const textOf = (line: string, pattern: RegExp) => {
+        const start = pattern.exec(line)
+        return start ? line.slice(start[0].length) : line.trim()
+    }
     for (const line of fileHeader.slice(0, HEADER_LINES)) {
-        if (openBlock) {
-            comments.push(insideBlockText(line))
-            openBlock = line.includes(openBlock) ? null : openBlock
+        if (openCloser) {
+            if (hasCodeAfter(line, openCloser, 0)) {
+                return { comments, complete: true }
+            }
+            comments.push(textOf(line, BLOCK_INTERIOR_START))
+            openCloser = line.includes(openCloser) ? null : openCloser
             continue
         }
         if (line.trim() === '' || line.startsWith('#!')) {
             continue
         }
-        const text = commentText(line)
-        if (text === null) {
+        const block = openedBlock(line)
+        if (!commentStart.test(line) || block?.codeAfter) {
             return { comments, complete: true }
         }
-        comments.push(text)
-        openBlock = blockCloser(line)
+        comments.push(textOf(line, commentStart))
+        openCloser = block && !block.closed ? block.closer : null
     }
     return { comments, complete: fileHeader.length === 0 }
 }
@@ -143,7 +153,8 @@ function hasGeneratedMarker(comments: string[]): boolean {
 }
 
 export function classifyFile(facts: DiffFileFacts): FileImpact {
-    const header = facts.fileHeader === null ? null : leadingComments(facts.fileHeader)
+    const commentStart = commentSyntax(facts.path)
+    const header = facts.fileHeader === null ? null : leadingComments(facts.fileHeader, commentStart)
     const markersChecked = header?.complete ?? false
     const impact = (category: ImpactCategory, reason: string): FileImpact => ({
         path: facts.path,
@@ -159,7 +170,7 @@ export function classifyFile(facts: DiffFileFacts): FileImpact {
     if (isStandardArtifact(facts.path)) {
         return impact('generated', 'Matches a standard generated file name')
     }
-    if (header && !MARKDOWN.test(facts.path) && hasGeneratedMarker(header.comments)) {
+    if (header && hasGeneratedMarker(header.comments)) {
         return impact('generated', 'Its leading comment block says it is generated')
     }
     if (TEST_PATHS.some((pattern) => pattern.test(facts.path))) {
@@ -167,7 +178,7 @@ export function classifyFile(facts: DiffFileFacts): FileImpact {
     }
     return impact(
         'production',
-        markersChecked ? 'No generated or test evidence' : 'No generated or test evidence in the path; the diff does not show the whole leading comment block, so its header was not checked',
+        markersChecked ? 'No generated or test evidence' : 'No generated or test evidence in the path; the diff does not show the whole leading comment block, so it was not checked for a generated marker',
     )
 }
 

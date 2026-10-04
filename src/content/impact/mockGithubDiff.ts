@@ -8,8 +8,10 @@ export interface MockDiffFile {
     split?: { left: string; right: string }[]
     githubGenerated?: boolean
     collapsed?: boolean
+    emptyNotice?: string
     deleted?: boolean
     comment?: string
+    commentTable?: boolean
 }
 
 function element(doc: Document, tag: string, attributes: Record<string, string> = {}, text?: string): HTMLElement {
@@ -110,10 +112,23 @@ export function expandMockContext(doc: Document, path: string, lines: string[]):
     )
 }
 
-function commentRow(doc: Document, text: string): HTMLElement {
+function commentTable(doc: Document): HTMLElement {
+    const table = element(doc, 'table')
+    const row = element(doc, 'tr')
+    row.append(element(doc, 'td', {}, 'before'), element(doc, 'td', {}, 'after'))
+    table.append(row)
+    return table
+}
+
+function commentRow(doc: Document, text: string, withTable: boolean): HTMLElement {
     const row = element(doc, 'tr', { class: 'inline-comments js-inline-comments-container' })
     const cell = element(doc, 'td', { colspan: '3' })
-    cell.append(element(doc, 'div', { class: 'review-comment' }, text), element(doc, 'button', { type: 'button' }, 'Reply'))
+    const body = element(doc, 'div', { class: 'review-comment' }, text)
+    if (withTable) {
+        cell.append(body, commentTable(doc), element(doc, 'button', { type: 'button' }, 'Reply'))
+    } else {
+        cell.append(body, element(doc, 'button', { type: 'button' }, 'Reply'))
+    }
     row.append(cell)
     return row
 }
@@ -143,8 +158,8 @@ function content(doc: Document, file: MockDiffFile): HTMLElement {
         body.append(loadDiffPlaceholder(doc, file.path, 'Large diffs are not rendered by default.'))
         return body
     }
-    if (file.additions === undefined) {
-        body.append(element(doc, 'div', { class: 'data highlight empty' }, 'Binary file not shown.'))
+    if (file.additions === undefined || file.emptyNotice) {
+        body.append(element(doc, 'div', { class: 'data highlight empty' }, file.emptyNotice ?? 'Binary file not shown.'))
         return body
     }
     const table = element(doc, 'table', { class: 'diff-table js-diff-table' })
@@ -156,7 +171,7 @@ function content(doc: Document, file: MockDiffFile): HTMLElement {
     }
     file.split?.forEach((line, i) => rows.append(splitRow(doc, line, i + 1)))
     if (file.comment) {
-        rows.append(commentRow(doc, file.comment))
+        rows.append(commentRow(doc, file.comment, !!file.commentTable))
     }
     table.append(rows)
     body.append(table)

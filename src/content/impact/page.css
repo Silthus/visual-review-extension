@@ -21,9 +21,9 @@
 [data-vr-impact='test'] > .file-header {
     box-shadow: inset 4px 0 0 var(--borderColor-accent-emphasis, #0969da);
 }
-[data-vr-generated='dim'] [data-vr-impact='generated'] .diff-table tr:not(.inline-comments) > td {
+[data-vr-generated='dim'] [data-vr-impact='generated'] .diff-table > tbody > tr:not(.inline-comments) > td {
     opacity: 0.45;
 }
-[data-vr-generated='hide'] [data-vr-impact='generated'] .diff-table tr:not(.inline-comments) {
+[data-vr-generated='hide'] [data-vr-impact='generated'] .diff-table > tbody > tr:not(.inline-comments) {
     display: none;
 }

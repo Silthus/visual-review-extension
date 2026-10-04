@@ -15,9 +15,10 @@ function codeCell(row: Element, side: 'left' | 'right'): Element | null {
     return row.querySelector(`[data-split-side="${side}"] .blob-code-inner`) ?? row.querySelector('td:not([data-split-side]) .blob-code-inner')
 }
 
-function sideLines(table: Element, side: 'left' | 'right'): Map<number, string> {
+function sideLines(table: HTMLTableElement, side: 'left' | 'right'): Map<number, string> {
     const lines = new Map<number, string>()
-    for (const row of table.querySelectorAll('tr')) {
+    for (let i = 0; i < table.rows.length; i++) {
+        const row = table.rows[i]!
         const numbers = [...row.querySelectorAll('td.blob-num')].map((cell) => Number(cell.getAttribute('data-line-number')))
         if (numbers.some((number) => number > HEADER_LINES)) {
             break
@@ -36,10 +37,10 @@ function sideLines(table: Element, side: 'left' | 'right'): Map<number, string> 
 
 function fileHeader(container: Element, deleted: boolean): string[] | null {
     const content = container.querySelector('.js-file-content')
-    if (content?.querySelector(':scope > .highlight.empty')?.textContent?.includes('Binary file not shown')) {
+    if (content?.querySelector(':scope > .highlight.empty')) {
         return []
     }
-    const table = content?.querySelector('table.diff-table')
+    const table = content?.querySelector<HTMLTableElement>('table.diff-table')
     if (!table) {
         return null
     }

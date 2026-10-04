@@ -84,7 +84,7 @@ function completenessNotes(summary: ImpactSummary, fileCount: number): Note[] {
     if (summary.uncheckedFiles > 0) {
         const count = summary.uncheckedFiles
         notes.push({
-            text: `${plural(count, 'file does', 'files do')} not show ${its(count)} whole leading comment block, so a generated marker there was not checked. Expand the diff to check it.`,
+            text: `${plural(count, 'file does', 'files do')} not show ${its(count)} whole leading comment block, so a generated marker there was not checked. Load or expand the diff to check it.`,
             attention: false,
         })
     }
