@@ -1,11 +1,13 @@
 // Runs on every github.com page, so it stays tiny: parse the URL, check the repo index in
-// storage, and only load the sidebar module (React + hoggies) for a PR in a tracked repo.
+// storage, and only load the sidebar module (React + hoggies) for a PR in a tracked repo,
+// or the code impact module on any PR's Files changed page.
 
 import { extensionBrowser } from '../shared/browser'
-import { parsePullRequestUrl } from '../shared/github'
+import { isPullRequestDiffUrl, parsePullRequestUrl } from '../shared/github'
 import { send } from '../shared/messages'
 import { lookupRepo, needsRefresh, repoIndexItem } from '../shared/repoIndex'
 import { onStorageChange } from '../shared/storage'
+import type { CodeImpactHandle } from './impact/codeImpact'
 import type { SidebarHandle } from './mount'
 
 const HOST_ID = 'posthog-visual-review'
@@ -50,9 +52,38 @@ function unmount(): void {
     host = null
 }
 
+let impact: CodeImpactHandle | null = null
+let impactPath = ''
+let impactBody: HTMLElement | null = null
+
+function stopImpact(): void {
+    impact?.stop()
+    impact = null
+    impactPath = ''
+    impactBody = null
+}
+
+async function syncImpact(id: number): Promise<void> {
+    if (!isPullRequestDiffUrl(location.href)) {
+        stopImpact()
+        return
+    }
+    if (impact && impactPath === location.pathname && impactBody === document.body) {
+        return
+    }
+    const { mountCodeImpact } = (await import(extensionBrowser().runtime.getURL('impact.js'))) as typeof import('./impact')
+    if (id === syncId) {
+        stopImpact()
+        impact = mountCodeImpact()
+        impactPath = location.pathname
+        impactBody = document.body
+    }
+}
+
 async function sync(): Promise<void> {
     const id = ++syncId
     lastHref = location.href
+    void syncImpact(id)
     const pr = parsePullRequestUrl(location.href)
     // No index means signed out: signing in happens in the toolbar popup, never on GitHub.
     const index = pr ? await repoIndexItem.get() : null

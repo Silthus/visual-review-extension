@@ -32,6 +32,7 @@ const builds = [
     { ...shared, entryPoints: { content: 'src/content/index.ts' }, format: 'iife', outdir },
     // …which dynamic-imports the sidebar module (React + hoggies) only for PRs in tracked repos.
     { ...shared, entryPoints: { sidebar: 'src/content/mount.tsx' }, format: 'esm', outdir },
+    { ...shared, entryPoints: { impact: 'src/content/impact/index.ts' }, format: 'esm', outdir },
     { ...shared, entryPoints: { popup: 'src/popup/index.tsx' }, format: 'iife', outdir },
 ]
 
