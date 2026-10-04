@@ -7,6 +7,9 @@
             body[data-theme='light'] {
                 --bgColor-default: #ffffff; --bgColor-muted: #f6f8fa; --fgColor-default: #1f2328; --fgColor-muted: #59636e;
                 --borderColor-default: #d1d9e0; --borderColor-muted: #d1d9e0b3; --fgColor-accent: #0969da;
+                --bgColor-accent-emphasis: #0969da; --borderColor-accent-emphasis: #0969da; --fgColor-onEmphasis: #ffffff;
+                --fgColor-success: #1a7f37; --fgColor-danger: #d1242f; --fgColor-attention: #9a6700;
+                --diffBlob-additionLine-bgColor: #dafbe1; --diffBlob-deletionLine-bgColor: #ffebe9;
             }
             body[data-theme='dark'] {
                 --bgColor-default: #0d1117; --bgColor-muted: #151b23; --bgColor-neutral-muted: #656c7633;
@@ -19,6 +22,8 @@
                 --button-default-borderColor-rest: #3d444d; --button-default-borderColor-hover: #3d444d;
                 --button-primary-bgColor-rest: #238636; --button-primary-bgColor-hover: #29903b; --button-primary-borderColor-rest: #ffffff1a;
                 --button-invisible-bgColor-hover: #656c7633;
+                --bgColor-accent-emphasis: #1f6feb; --borderColor-accent-emphasis: #1f6feb; --fgColor-onEmphasis: #ffffff;
+                --diffBlob-additionLine-bgColor: #2ea04326; --diffBlob-deletionLine-bgColor: #f851491a;
             }
             body { margin: 0; background: var(--bgColor-default); color: var(--fgColor-default);
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; }
@@ -37,6 +42,25 @@
                 border: 1px dashed var(--borderColor-default); border-radius: 6px; font-size: 13px; color: var(--fgColor-muted); }
             .hidden-state::before { content: '∅'; font-weight: 600; }
             body.popup-preview { width: 360px; }
+            /* GitHub's classic Files changed markup, as far as the code impact module reads and styles it. */
+            .gh-files-page { max-width: 920px; margin: 0 auto; padding: 16px 32px 40px; font-size: 14px; }
+            .gh-files-page [role='tree'] { display: none; }
+            .file { margin-bottom: 16px; border: 1px solid var(--borderColor-default); border-radius: 6px; overflow: hidden; }
+            .file-header { display: flex; justify-content: space-between; padding: 8px 16px; background: var(--bgColor-muted); border-bottom: 1px solid var(--borderColor-default); font-size: 12px; }
+            .file-info { display: flex; align-items: center; gap: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+            .file-info .sr-only { display: none; }
+            .file-info a { color: var(--fgColor-default); text-decoration: none; font-weight: 600; }
+            .file-actions { color: var(--fgColor-muted); }
+            .diff-table { width: 100%; border-collapse: collapse; font: 12px/20px ui-monospace, SFMono-Regular, Menlo, monospace; }
+            .blob-num { width: 1%; min-width: 40px; padding: 0 10px; text-align: right; color: var(--fgColor-muted); }
+            .blob-num[data-line-number]::before { content: attr(data-line-number); }
+            .blob-code { padding: 0 10px; white-space: pre; }
+            .blob-code-addition, .blob-num-addition { background: var(--diffBlob-additionLine-bgColor); }
+            .blob-code-deletion, .blob-num-deletion { background: var(--diffBlob-deletionLine-bgColor); }
+            .blob-code-inner::before { content: attr(data-code-marker); padding-right: 8px; }
+            .inline-comments td { padding: 8px 16px; border-top: 1px solid var(--borderColor-default); background: var(--bgColor-default); font-family: -apple-system, 'Segoe UI', sans-serif; }
+            .inline-comments button { margin-left: 8px; }
+            .js-diff-load-container, .highlight.empty { padding: 16px; text-align: center; color: var(--fgColor-muted); font-size: 12px; }
         </style>
     </head>
     <body>

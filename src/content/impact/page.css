@@ -1,0 +1,29 @@
+[data-vr-impact-badge] {
+    display: inline-block;
+    margin: 0 8px;
+    padding: 0 7px;
+    border: 1px solid var(--borderColor-default, #d1d9e0);
+    border-radius: 2em;
+    font-family: var(--fontStack-sansSerif, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 18px;
+    white-space: nowrap;
+    color: var(--fgColor-muted, #59636e);
+}
+[data-vr-impact-badge='test'] {
+    border-color: var(--borderColor-accent-emphasis, #0969da);
+    color: var(--fgColor-accent, #0969da);
+}
+[data-vr-impact-badge='generated'] {
+    border-style: dashed;
+}
+[data-vr-impact='test'] > .file-header {
+    box-shadow: inset 4px 0 0 var(--borderColor-accent-emphasis, #0969da);
+}
+[data-vr-generated='dim'] [data-vr-impact='generated'] tr[data-hunk] > td {
+    opacity: 0.45;
+}
+[data-vr-generated='hide'] [data-vr-impact='generated'] tr[data-hunk] {
+    display: none;
+}

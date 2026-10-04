@@ -32,7 +32,7 @@
     ],
     "web_accessible_resources": [
         {
-            "resources": ["sidebar.js"],
+            "resources": ["sidebar.js", "impact.js"],
             "matches": ["https://github.com/*"]
         }
     ],

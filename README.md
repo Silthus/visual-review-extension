@@ -61,9 +61,11 @@ A shared first-party Firefox client still requires a hosted metadata document th
 ## How it works
 
 ```
-GitHub page ──(content.js, 2 KB)── repo index in chrome.storage ──▶ not a tracked PR: nothing, no request
+GitHub page ──(content.js, 3 KB)── repo index in chrome.storage ──▶ not a tracked PR: nothing, no request
                     │
-                    └── tracked PR ──▶ sidebar.js ─▶ service worker ──(OAuth bearer)──▶ PostHog API
+                    ├── tracked PR ──▶ sidebar.js ─▶ service worker ──(OAuth bearer)──▶ PostHog API
+                    │
+                    └── any PR's Files changed ──▶ impact.js (reads the diff on the page, no request, no sign-in)
 ```
 
 - **Auth.** OAuth 2.0 authorization code + PKCE, run through the shared browser adapter and the browser's `identity.launchWebAuthFlow`.
@@ -78,6 +80,11 @@ GitHub page ──(content.js, 2 KB)── repo index in chrome.storage ──�
   - A visit to an unknown repo rebuilds it at most hourly, so newly enabled repos show up. After a failure it backs off for 5 minutes.
   - The default project wins when a repo is set up in more than one project.
 - **Loader + sidebar.** `content.js` runs on every GitHub page but only parses the URL and reads the index. For a PR in a tracked repo it imports `sidebar.js` (React and the hoggies). Everything else costs no network request and never wakes the worker.
+- **Code impact.** On any PR's Files changed page, `impact.js` labels each file Production, Test, or Generated and adds a Change impact overview above the diff with added and deleted lines per category. The Generated lines control shows, dims, or hides generated diff lines; review comments stay visible, and the choice is shared across tabs through storage.
+  - Generated: GitHub's generated-file metadata (`linguist-generated`), standard generated names such as lockfiles, `*.min.js`, `*.pb.go`, `*_pb2.py`, `__generated__/`, `*.generated.*`, or an `@generated`, `Code generated … DO NOT EDIT`, or `auto-generated` marker in the file's leading comment block. Nothing guesses whether code was written by AI.
+  - Test: `*.test.*` and `*.spec.*` JavaScript and TypeScript files, `__tests__/`, `__snapshots__/`, `test/` and `tests/` directories, `test_*.py`, `*_test.py`, and `conftest.py`.
+  - Classification is per file. A file's lines all count toward its category; generated regions inside hand-written files aren't split out.
+  - The overview says when its counts are incomplete: files GitHub hasn't loaded yet, files without line counts, and files whose first lines aren't in the diff, so their header couldn't be checked.
 - **Runs.** The newest non-superseded run is kept for each run type. While a run is processing, the section refreshes every 15s; a tracked PR with no runs yet is checked every minute. It also refreshes when you come back to the tab.
 - **Account state.** `background/session.ts` is the only place that clears the session, profile, and index. Every surface re-reads state when `chrome.storage` changes, so signing in or out updates open tabs straight away.
 
@@ -130,6 +137,8 @@ The [release workflow](.github/workflows/release.yml) checks that the tag matche
 | `src/background/visualReview.ts`  | Runs for a PR in a tracked repo                                          |
 | `src/content/index.ts`            | Loader: URL + index check, placement in GitHub's PR sidebar              |
 | `src/content/mount.tsx`, `App.tsx`, `Sidebar.tsx` | The sidebar section, rendered in a shadow root           |
+| `src/content/impact/`             | Code impact on Files changed: diff reader, overview, file badges         |
+| `src/shared/codeImpact.ts`        | Generated, test, and production rules and the per-category totals        |
 | `src/popup/`                      | Popup UI                                                                 |
 | `src/shared/browser.ts`          | Shared access to native Firefox `browser` APIs and Chrome `chrome` APIs   |
 | `src/shared/runState.ts`          | Run → state rules, mirroring `REVIEW_STATE_FILTERS` in the backend       |
@@ -138,6 +147,7 @@ The [release workflow](.github/workflows/release.yml) checks that the tag matche
 ## Known limitations
 
 - **GitHub DOM.** The section mounts in `#partial-discussion-sidebar`, right after the Labels section (found by its `labels_updated` channel, or `.js-issue-labels`). If GitHub changes that markup, `findPlacement()` in `src/content/index.ts` is the only place to fix.
-- **Conversation tab only.** GitHub only shows the sidebar there, so Commits, Checks, and Files changed show nothing.
+- **Conversation tab only.** GitHub only shows the sidebar there, so Commits, Checks, and Files changed show no visual review results.
+- **Code impact reads GitHub's classic Files changed markup** (`.file[data-tagsearch-path]` entries inside `#files`) in `src/content/impact/githubDiff.ts`. On a diff view with other markup it finds no files and stays hidden.
 - **Reading only.** The extension doesn't approve or tolerate snapshots.
 - **Firefox sign-in.** The default hosted OAuth client registers only Chrome. Firefox developer builds need a separately registered public client as described above.
