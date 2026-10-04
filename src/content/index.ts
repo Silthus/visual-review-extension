@@ -1,3 +1,4 @@
+import { extensionBrowser } from '../shared/browser'
 // Runs on every github.com page, so it stays tiny: parse the URL, check the repo index in
 // storage, and only load the sidebar module (React + hoggies) for a PR in a tracked repo.
 
@@ -69,7 +70,7 @@ async function sync(): Promise<void> {
         return
     }
 
-    const { mountSidebar } = (await import(chrome.runtime.getURL('sidebar.js'))) as typeof import('./mount')
+    const { mountSidebar } = (await import(extensionBrowser().runtime.getURL('sidebar.js'))) as typeof import('./mount')
     if (id !== syncId) {
         return
     }

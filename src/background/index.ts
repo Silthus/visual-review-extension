@@ -1,3 +1,4 @@
+import { extensionBrowser } from '../shared/browser'
 import { errorMessage } from '../shared/errors'
 import { CLOUD_AUTH_HOST, normalizeHost } from '../shared/host'
 import type { AuthState, Request, ResponseMap } from '../shared/messages'
@@ -134,7 +135,7 @@ async function handle(request: Request): Promise<ResponseMap[Request['type']]> {
     }
 }
 
-chrome.runtime.onMessage.addListener((request: Request, _sender, sendResponse) => {
+extensionBrowser().runtime.onMessage.addListener((request: Request, _sender, sendResponse) => {
     handle(request)
         .then((data) => sendResponse({ ok: true, data }))
         .catch((error: unknown) => sendResponse({ ok: false, error: errorMessage(error) }))

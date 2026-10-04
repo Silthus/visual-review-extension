@@ -1,4 +1,5 @@
-/** A typed chrome.storage.local key. Setting null removes it. */
+import { extensionBrowser } from './browser'
+/** A typed browser storage.local key. Setting null removes it. */
 export interface StorageItem<T> {
     key: string
     get(): Promise<T | null>
@@ -9,19 +10,19 @@ export function storageItem<T>(key: string): StorageItem<T> {
     return {
         key,
         async get() {
-            return ((await chrome.storage.local.get(key))[key] as T | undefined) ?? null
+            return ((await extensionBrowser().storage.local.get(key))[key] as T | undefined) ?? null
         },
         async set(value) {
             if (value === null) {
-                await chrome.storage.local.remove(key)
+                await extensionBrowser().storage.local.remove(key)
             } else {
-                await chrome.storage.local.set({ [key]: value })
+                await extensionBrowser().storage.local.set({ [key]: value })
             }
         },
     }
 }
 
-/** Call `listener` whenever one of `items` changes in chrome.storage.local. Returns the unsubscribe. */
+/** Call `listener` whenever one of `items` changes in browser storage.local. Returns the unsubscribe. */
 export function onStorageChange(items: StorageItem<unknown>[], listener: () => void): () => void {
     const keys = new Set(items.map((i) => i.key))
     const handler = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
@@ -29,6 +30,6 @@ export function onStorageChange(items: StorageItem<unknown>[], listener: () => v
             listener()
         }
     }
-    chrome.storage.onChanged.addListener(handler)
-    return () => chrome.storage.onChanged.removeListener(handler)
+    extensionBrowser().storage.onChanged.addListener(handler)
+    return () => extensionBrowser().storage.onChanged.removeListener(handler)
 }

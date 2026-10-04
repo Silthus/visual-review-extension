@@ -1,11 +1,4 @@
-// OAuth 2.0 authorization code + PKCE against PostHog, driven by chrome.identity.launchWebAuthFlow.
-//
-// PostHog Cloud goes through oauth.posthog.com, which picks the user's region (US or EU)
-// and hands back `posthog_base_url` with the token. Self-hosted / local instances are
-// talked to directly. Either way the client_id is the URL of our client ID metadata
-// document (CIMD) on posthog.com, which every PostHog instance fetches for itself, so
-// nothing has to be registered or pre-provisioned.
-
+import { extensionBrowser } from '../shared/browser'
 import { errorMessage } from '../shared/errors'
 import { errorDetail } from './http'
 
@@ -16,7 +9,9 @@ const SCOPES = ['visual_review:read', 'user:read', 'project:read', 'organization
 
 // Lives in PostHog/posthog.com at static/.well-known/oauth/visual-review/client-metadata.json. It
 // registers https://<extension id>.chromiumapp.org/, which the manifest's `key` pins.
-const CLIENT_ID = 'https://posthog.com/.well-known/oauth/visual-review/client-metadata.json'
+const DEFAULT_CLIENT_ID = 'https://posthog.com/.well-known/oauth/visual-review/client-metadata.json'
+const CONFIGURED_CLIENT_ID = typeof POSTHOG_OAUTH_CLIENT_ID === 'undefined' ? null : POSTHOG_OAUTH_CLIENT_ID
+const CLIENT_ID = CONFIGURED_CLIENT_ID ?? DEFAULT_CLIENT_ID
 
 export interface Session {
     authHost: string
@@ -86,7 +81,10 @@ function toSession(authHost: string, clientId: string, token: TokenResponse, pre
 }
 
 export async function signIn(authHost: string): Promise<Session> {
-    const redirectUri = chrome.identity.getRedirectURL()
+    const redirectUri = extensionBrowser().identity.getRedirectURL()
+    if (!CONFIGURED_CLIENT_ID && redirectUri !== 'https://coegljbgaffjilmoampifafjigkdmjaf.chromiumapp.org/') {
+        throw new SignInError(`Firefox needs a registered OAuth client for ${redirectUri}. Build with POSTHOG_OAUTH_CLIENT_ID set to that public client ID. See the Firefox setup in README.`)
+    }
     const verifier = randomString(48)
     const state = randomString(16)
     const params = new URLSearchParams({
@@ -101,7 +99,7 @@ export async function signIn(authHost: string): Promise<Session> {
 
     let redirect: string | undefined
     try {
-        redirect = await chrome.identity.launchWebAuthFlow({ url: `${authHost}/oauth/authorize?${params}`, interactive: true })
+        redirect = await extensionBrowser().identity.launchWebAuthFlow({ url: `${authHost}/oauth/authorize?${params}`, interactive: true })
     } catch (error) {
         throw new SignInError(errorMessage(error))
     }

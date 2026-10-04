@@ -1,3 +1,4 @@
+import { extensionBrowser } from '../shared/browser'
 import { HedgehogError, HedgehogExplorer, HedgehogHourglass, HedgehogSleepy } from '@posthog/brand/hoggies'
 import { Logo } from '@posthog/brand/logo'
 import { useEffect, useState } from 'react'
@@ -46,7 +47,7 @@ function SignedOut({ initialHost }: { initialHost: string }) {
         setBusy(true)
         try {
             // Custom hosts aren't in the manifest's host_permissions; ask while we have a user gesture.
-            if (mode === 'custom' && !(await chrome.permissions.request({ origins: [`${host}/*`] }))) {
+            if (mode === 'custom' && !(await extensionBrowser().permissions.request({ origins: [`${host}/*`] }))) {
                 throw new Error(`Permission to reach ${host} was declined`)
             }
             await send({ type: 'auth:signIn', host })
@@ -325,7 +326,7 @@ export function Popup() {
     useEffect(() => {
         const loadAuth = () => void send({ type: 'auth:get' }).then(setAuth)
         loadAuth()
-        void chrome.tabs
+        void extensionBrowser().tabs
             .query({ active: true, currentWindow: true })
             .then(([tab]) => setPr(tab?.url ? parsePullRequestUrl(tab.url) : null))
         return onStorageChange(WATCHED, loadAuth)

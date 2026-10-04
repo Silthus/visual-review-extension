@@ -1,3 +1,4 @@
+import { extensionBrowser } from './browser'
 import type { RepoIndexEntry } from './repoIndex'
 import type { ProjectBasic, PrResults, PullRequestRef } from './types'
 
@@ -12,7 +13,7 @@ export interface AuthState {
     indexBuiltAt?: number
 }
 
-// Mutations resolve with nothing: every surface re-reads state when chrome.storage changes.
+// Mutations resolve with nothing: every surface re-reads state when browser storage changes.
 export type Request =
     | { type: 'auth:get' }
     | { type: 'auth:signIn'; host: string }
@@ -32,9 +33,9 @@ export interface ResponseMap {
 
 type Envelope<T> = { ok: true; data: T } | { ok: false; error: string }
 
-/** Typed wrapper over chrome.runtime.sendMessage; the service worker owns all network and token access. */
+/** Typed wrapper over browser messaging; the service worker owns all network and token access. */
 export async function send<R extends Request>(request: R): Promise<ResponseMap[R['type']]> {
-    const response = (await chrome.runtime.sendMessage(request)) as Envelope<ResponseMap[R['type']]> | undefined
+    const response = (await extensionBrowser().runtime.sendMessage(request)) as Envelope<ResponseMap[R['type']]> | undefined
     if (!response) {
         throw new Error('No response from the extension background worker')
     }
