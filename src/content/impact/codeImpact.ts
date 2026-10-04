@@ -210,12 +210,15 @@ class Overview {
     }
 
     private renderReasons(files: FileImpact[]): void {
-        const flagged = files.filter((file) => file.category !== 'production')
-        this.reasonsSummary.textContent = `Why ${plural(flagged.length, 'file is', 'files are')} not production`
+        const flagged = files.filter((file) => file.category !== 'production' || !file.markersChecked)
+        this.reasonsSummary.textContent = `Classification details for ${plural(flagged.length, 'file')}`
         this.reasonsList.replaceChildren(
             ...flagged.map((file) => {
                 const item = element(this.doc, 'li')
                 item.append(element(this.doc, 'code', file.path), ` · ${CATEGORY_LABELS[file.category]}: ${file.reason}`)
+                if (!file.markersChecked && file.category !== 'generated') {
+                    item.append(' · Leading comment block not checked')
+                }
                 return item
             }),
         )
