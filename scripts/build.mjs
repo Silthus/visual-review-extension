@@ -27,7 +27,6 @@ const shared = {
 }
 
 const builds = [
-    // The service worker is an ES module (declared with "type": "module" in the manifest).
     { ...shared, entryPoints: { background: 'src/background/index.ts' }, format: browser === 'firefox' ? 'iife' : 'esm', outdir },
     // Content scripts can't be modules, so the loader that runs on every GitHub page is a small IIFE…
     { ...shared, entryPoints: { content: 'src/content/index.ts' }, format: 'iife', outdir },

@@ -33,7 +33,7 @@ pnpm dev:firefox        # rebuild on change
 
 Open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on**, and select `dist-firefox/manifest.json`. Firefox 128 or newer is required. Temporary add-ons disappear when Firefox restarts; installing permanently requires Mozilla signing, which these commands do not perform.
 
-**Sign-in requires Firefox OAuth registration.** The hosted client metadata currently registers only the Chrome callback. The default Firefox build loads, but sign-in stops before opening PostHog and shows the actual Firefox callback. The stable Gecko ID is `visual-review@posthog.com`; do not change it after registering a client.
+**Sign-in requires Firefox OAuth registration.** The hosted client metadata currently registers only the Chrome callback. The default Firefox build loads, and the signed-out popup shows the actual Firefox callback and disables sign-in until you configure a client. The stable Gecko ID is `visual-review@posthog.com`; do not change it after registering a client.
 
 For a developer build, register a public authorization-code client on the PostHog host you will use. Use the callback printed by the extension, PKCE with `S256`, token endpoint authentication `none`, and these scopes: `visual_review:read user:read project:read organization:read`. An instance administrator can register that client, or instances that support dynamic registration accept:
 

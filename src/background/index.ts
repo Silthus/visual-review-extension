@@ -5,7 +5,7 @@ import type { AuthState, Request, ResponseMap } from '../shared/messages'
 import { repoIndexItem } from '../shared/repoIndex'
 import { storageItem } from '../shared/storage'
 import type { CurrentUser, Paginated, ProjectBasic } from '../shared/types'
-import { revoke, signIn } from './auth'
+import { revoke, signIn, signInSetupError } from './auth'
 import { refreshRepoIndex } from './repoIndex'
 import {
     ApiError,
@@ -56,7 +56,7 @@ async function authState(): Promise<AuthState> {
         repoIndexItem.get(),
     ])
     if (!session) {
-        return { signedIn: false, host: lastHost ?? CLOUD_AUTH_HOST }
+        return { signedIn: false, host: lastHost ?? CLOUD_AUTH_HOST, signInError: signInSetupError() }
     }
     return {
         signedIn: true,

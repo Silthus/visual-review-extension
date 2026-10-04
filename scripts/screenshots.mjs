@@ -1,6 +1,3 @@
-// Screenshots of every sidebar state (light + dark) and both popup states, rendered from the
-// design preview's mock data with headless Chrome. For PR descriptions: `pnpm screenshots`.
-// Set CHROME_PATH if Chrome isn't in the default location for your platform.
 import { execFileSync } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -25,14 +22,17 @@ const shots = [
     { name: 'sidebar-dark', query: 'theme=dark', size: '980,1060' },
     { name: 'popup-signed-in', query: 'popup=signedIn', size: '360,640' },
     { name: 'popup-signed-out', query: 'popup=signedOut', size: '360,520' },
+    { name: 'popup-firefox-needs-client-light', query: 'popup=firefoxNeedsClient', size: '360,640' },
+    { name: 'popup-firefox-needs-client-dark', query: 'popup=firefoxNeedsClient', size: '360,640', dark: true },
 ]
 
-for (const { name, query, size } of shots) {
+for (const { name, query, size, dark } of shots) {
     const file = resolve(outdir, `${name}.png`)
     execFileSync(chrome, [
         '--headless=new',
         '--hide-scrollbars',
         '--force-device-scale-factor=2',
+        ...(dark ? ['--force-dark-mode'] : []),
         `--window-size=${size}`,
         // Gives React and the fonts time to settle before the capture.
         '--virtual-time-budget=3000',

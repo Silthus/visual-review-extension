@@ -80,10 +80,17 @@ function toSession(authHost: string, clientId: string, token: TokenResponse, pre
     }
 }
 
+export function signInSetupError(redirectUri = extensionBrowser().identity.getRedirectURL()): string | undefined {
+    if (!CONFIGURED_CLIENT_ID && redirectUri !== 'https://coegljbgaffjilmoampifafjigkdmjaf.chromiumapp.org/') {
+        return `Firefox needs a registered OAuth client for ${redirectUri}. Build with POSTHOG_OAUTH_CLIENT_ID set to that public client ID. See the Firefox setup in README.`
+    }
+}
+
 export async function signIn(authHost: string): Promise<Session> {
     const redirectUri = extensionBrowser().identity.getRedirectURL()
-    if (!CONFIGURED_CLIENT_ID && redirectUri !== 'https://coegljbgaffjilmoampifafjigkdmjaf.chromiumapp.org/') {
-        throw new SignInError(`Firefox needs a registered OAuth client for ${redirectUri}. Build with POSTHOG_OAUTH_CLIENT_ID set to that public client ID. See the Firefox setup in README.`)
+    const setupError = signInSetupError(redirectUri)
+    if (setupError) {
+        throw new SignInError(setupError)
     }
     const verifier = randomString(48)
     const state = randomString(16)

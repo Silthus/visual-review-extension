@@ -1,6 +1,6 @@
 # Working on the visual review extension
 
-A Manifest V3 Chrome extension that shows PostHog visual review results in the sidebar of GitHub pull requests. It's an internal tool for the PostHog team, not a supported product. The [README](README.md) covers install, how it works, and the file layout; read it first.
+A Manifest V3 Chrome and Firefox extension that shows PostHog visual review results in the sidebar of GitHub pull requests. It's an internal tool for the PostHog team, not a supported product. The [README](README.md) covers install, how it works, and the file layout; read it first.
 
 ## Commands
 
@@ -8,24 +8,28 @@ A Manifest V3 Chrome extension that shows PostHog visual review results in the s
 pnpm install
 pnpm typecheck      # tsc, strict
 pnpm test           # vitest
-pnpm build          # → dist/, load it with "Load unpacked" in chrome://extensions
+pnpm build          # Chrome → dist/, load unpacked in chrome://extensions
+pnpm build:firefox  # Firefox → dist-firefox/, load temporarily in about:debugging
+pnpm zip:firefox    # → posthog-visual-review-firefox.zip
 pnpm dev            # rebuild on change; reload the extension after each edit
 pnpm preview        # build the design preview → preview/out/index.html
 pnpm screenshots    # PNGs of every sidebar state and the popup → preview/out/screenshots/
 ```
 
-CI runs typecheck, test, and build on every push. Run all three before you open a PR. There's no formatter or linter, so match the code around you: 4-space indent, single quotes, no semicolons, strict TypeScript.
+CI runs typecheck, test, and both browser builds on every push. Run these before you open a PR. There's no formatter or linter, so match the code around you: 4-space indent, single quotes, no semicolons, strict TypeScript.
 
 ## Rules that aren't obvious from the code
 
+- **Browser APIs use `extensionBrowser()` from `src/shared/browser.ts`.** It selects Firefox's Promise-based `browser` namespace or Chrome's `chrome` namespace.
 - **`src/content/index.ts` runs on every GitHub page.** Keep it tiny. It parses the URL, reads the repo index from storage, and imports the sidebar module only for PRs in tracked repos. Don't import React, the hoggies, or anything heavy into it. Pages that aren't tracked PRs must not make network requests or wake the service worker.
 - **GitHub's DOM is only touched in `findPlacement()`** (`src/content/index.ts`). When GitHub changes its markup, that's the one place to fix.
 - **The sidebar section lives in a shadow root and styles itself with GitHub's Primer CSS variables**, so it follows light, dark, and dimmed themes. Use Primer variables, not hardcoded colors. Its host element carries GitHub's own `discussion-sidebar-item` class for spacing and dividers, and is `hidden` when there's nothing to show.
 - **Account state (session, profile, repo index) is only cleared through `clearAccount()`** in `src/background/session.ts`, so the three never disagree. Don't null those storage keys anywhere else.
-- **Every surface re-reads state when `chrome.storage` changes.** Write state to storage and let the popup and tabs react. Don't message each tab directly.
+- **Every surface re-reads state when browser storage changes.** Write state to storage and let the popup and tabs react. Don't message each tab directly.
 - **API calls use `credentials: 'omit'`.** Some PostHog endpoints prefer session cookies over the bearer token, so a request that sends cookies can act as the wrong user.
 - **`src/shared/runState.ts` mirrors `REVIEW_STATE_FILTERS` in the PostHog backend** (`products/visual_review/backend/logic/run_queries.py`). If you change how a run maps to a state, check the backend still agrees.
 - **The manifest `key` pins the extension ID**, and with it the OAuth redirect `https://coegljbgaffjilmoampifafjigkdmjaf.chromiumapp.org/` that the client metadata document registers (PostHog/posthog.com, `static/.well-known/oauth/visual-review/client-metadata.json`). Changing the key breaks sign-in until the document changes too. The private key is in 1Password as **Visual Review extension signing key**; never commit it.
+- **Firefox OAuth setup.** The stable Gecko ID fixes its callback. The default hosted client registers only Chrome; Firefox builds need an explicitly registered public `POSTHOG_OAUTH_CLIENT_ID`. The signed-out auth state reports this prerequisite before the popup requests host access. See [Firefox developer setup](README.md#firefox-developer-setup).
 - **OAuth scopes are listed twice**: in `src/background/auth.ts` and in the client metadata document, which caps them. A new scope goes in both, or sign-in fails with `invalid_scope`.
 - **Manifest permissions are user-facing.** A new permission or host permission shows up in Chrome's install prompt. Add one only when nothing else works, and say why in the PR.
 - **GitHub Actions are pinned to commit SHAs**, as the PostHog org requires. Keep the version in a trailing comment.
