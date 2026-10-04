@@ -1,5 +1,6 @@
 // Runs on every github.com page, so it stays tiny: parse the URL, check the repo index in
-// storage, and only load the sidebar module (React + hoggies) for a PR in a tracked repo.
+// storage, and only load the sidebar module (React + hoggies) for a PR in a tracked repo,
+// or the code impact module on any PR's Files changed page.
 
 import { extensionBrowser } from '../shared/browser'
 import { isPullRequestDiffUrl, parsePullRequestUrl } from '../shared/github'

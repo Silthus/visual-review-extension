@@ -30,13 +30,13 @@ export interface ImpactSummary {
     uncountedFiles: number
     uncheckedFiles: number
     notLoadedFiles: number | null
-    complete: boolean
 }
 
 const LOCKFILES = new Set([
     'pnpm-lock.yaml',
     'package-lock.json',
     'yarn.lock',
+    'bun.lock',
     'bun.lockb',
     'poetry.lock',
     'uv.lock',
@@ -67,7 +67,7 @@ const TEST_PATHS = [
 
 export const HEADER_LINES = 40
 
-const COMMENT_START = /^\s*(\/\/|\/\*|\*|#|<!--|--)\s*/
+const COMMENT_START = /^\s*(\/\/+|\/\*+|\*+|#+|<!--|--)\s*/
 
 const GENERATED_MARKERS = [/^@generated\b/, /^Code generated .* DO NOT EDIT\.?/, /^This (file|code) (is|was) (auto-?generated|automatically generated)\b/i, /^(auto-?generated|automatically generated) (by|from|with)\b/i]
 
@@ -79,9 +79,26 @@ function isStandardArtifact(path: string): boolean {
     return LOCKFILES.has(fileName(path)) || GENERATED_PATHS.some((pattern) => pattern.test(path))
 }
 
+const BLOCK_CLOSERS: Record<string, string> = { '/*': '*/', '<!--': '-->' }
+
+const MARKDOWN = /\.(md|mdx|markdown)$/i
+
 function commentText(line: string): string | null {
     const start = COMMENT_START.exec(line)
-    return start ? line.slice(start[0].length) : null
+    if (!start || hasCodeAfterInlineComment(line)) {
+        return null
+    }
+    return line.slice(start[0].length)
+}
+
+function hasCodeAfterInlineComment(line: string): boolean {
+    const trimmed = line.trimStart()
+    const opener = Object.keys(BLOCK_CLOSERS).find((open) => trimmed.startsWith(open))
+    if (!opener) {
+        return false
+    }
+    const close = trimmed.indexOf(BLOCK_CLOSERS[opener]!, opener.length)
+    return close >= 0 && trimmed.slice(close + BLOCK_CLOSERS[opener]!.length).trim() !== ''
 }
 
 interface LeadingComments {
@@ -89,9 +106,25 @@ interface LeadingComments {
     complete: boolean
 }
 
+function blockCloser(line: string): string | null {
+    const opener = Object.keys(BLOCK_CLOSERS).find((open) => line.trimStart().startsWith(open))
+    const closer = opener ? BLOCK_CLOSERS[opener]! : null
+    return closer && !line.includes(closer, line.indexOf(opener!) + opener!.length) ? closer : null
+}
+
+function insideBlockText(line: string): string {
+    return commentText(line) ?? line.trim()
+}
+
 function leadingComments(fileHeader: string[]): LeadingComments {
     const comments: string[] = []
+    let openBlock: string | null = null
     for (const line of fileHeader.slice(0, HEADER_LINES)) {
+        if (openBlock) {
+            comments.push(insideBlockText(line))
+            openBlock = line.includes(openBlock) ? null : openBlock
+            continue
+        }
         if (line.trim() === '' || line.startsWith('#!')) {
             continue
         }
@@ -100,6 +133,7 @@ function leadingComments(fileHeader: string[]): LeadingComments {
             return { comments, complete: true }
         }
         comments.push(text)
+        openBlock = blockCloser(line)
     }
     return { comments, complete: fileHeader.length === 0 }
 }
@@ -125,8 +159,8 @@ export function classifyFile(facts: DiffFileFacts): FileImpact {
     if (isStandardArtifact(facts.path)) {
         return impact('generated', 'Matches a standard generated file name')
     }
-    if (header && hasGeneratedMarker(header.comments)) {
-        return impact('generated', 'The file header says it is generated')
+    if (header && !MARKDOWN.test(facts.path) && hasGeneratedMarker(header.comments)) {
+        return impact('generated', 'Its leading comment block says it is generated')
     }
     if (TEST_PATHS.some((pattern) => pattern.test(facts.path))) {
         return impact('test', 'Path follows a test file convention')
@@ -168,6 +202,5 @@ export function summarizeImpact(files: FileImpact[], expectedFiles: number | nul
         uncountedFiles,
         uncheckedFiles,
         notLoadedFiles,
-        complete: notLoadedFiles === 0 && uncountedFiles === 0 && uncheckedFiles === 0,
     }
 }

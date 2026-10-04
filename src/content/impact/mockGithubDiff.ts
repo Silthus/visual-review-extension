@@ -88,6 +88,28 @@ function splitRow(doc: Document, line: { left: string; right: string }, number: 
     return row
 }
 
+function hunkRow(doc: Document, start: number): HTMLElement {
+    const row = element(doc, 'tr', { class: 'js-expandable-line js-skip-tagsearch', 'data-position': '0' })
+    row.append(
+        element(doc, 'td', { class: 'blob-num blob-num-expandable', 'data-line-number': '...' }),
+        element(doc, 'td', { class: 'blob-code blob-code-inner blob-code-hunk' }, `@@ -${start} +${start} @@`),
+    )
+    return row
+}
+
+export function expandMockContext(doc: Document, path: string, lines: string[]): void {
+    const hunk = doc.querySelector(`[data-tagsearch-path="${path}"] tr.js-expandable-line`)!
+    const numbers = { left: 1, right: 1 }
+    hunk.replaceWith(
+        ...lines.map((line) => {
+            const row = codeRow(doc, ` ${line}`, numbers)
+            row.removeAttribute('data-hunk')
+            row.className = 'blob-expanded'
+            return row
+        }),
+    )
+}
+
 function commentRow(doc: Document, text: string): HTMLElement {
     const row = element(doc, 'tr', { class: 'inline-comments js-inline-comments-container' })
     const cell = element(doc, 'td', { colspan: '3' })
@@ -128,6 +150,7 @@ function content(doc: Document, file: MockDiffFile): HTMLElement {
     const table = element(doc, 'table', { class: 'diff-table js-diff-table' })
     const rows = element(doc, 'tbody')
     const numbers = { left: file.startLine ?? 1, right: file.startLine ?? 1 }
+    rows.append(hunkRow(doc, numbers.left))
     for (const line of file.lines ?? []) {
         rows.append(codeRow(doc, line, numbers))
     }

@@ -84,7 +84,7 @@ function completenessNotes(summary: ImpactSummary, fileCount: number): Note[] {
     if (summary.uncheckedFiles > 0) {
         const count = summary.uncheckedFiles
         notes.push({
-            text: `${plural(count, 'file does', 'files do')} not show ${its(count)} first lines, so ${its(count)} generated header was not checked. Expand the diff to line 1 to check it.`,
+            text: `${plural(count, 'file does', 'files do')} not show ${its(count)} whole leading comment block, so a generated marker there was not checked. Expand the diff to check it.`,
             attention: false,
         })
     }
@@ -140,6 +140,16 @@ class Overview {
         const block = element(this.doc, 'div')
         const table = element(this.doc, 'table')
         table.setAttribute('aria-label', 'Lines changed by category')
+        const head = element(this.doc, 'thead')
+        const headings = element(this.doc, 'tr')
+        for (const heading of ['Category', 'Files', 'Added', 'Deleted']) {
+            const cell = element(this.doc, 'th', heading)
+            cell.scope = 'col'
+            headings.append(cell)
+        }
+        head.className = 'visually-hidden'
+        head.append(headings)
+        table.append(head)
         const body = element(this.doc, 'tbody')
         for (const category of IMPACT_CATEGORIES) {
             const row = element(this.doc, 'tr')
@@ -195,7 +205,7 @@ class Overview {
             }
             return item
         })
-        items.push(element(this.doc, 'li', 'Generated means GitHub metadata, a standard generated file name, or a generated header comment says so. Tests follow common TypeScript and Python test paths.'))
+        items.push(element(this.doc, 'li', 'Generated means GitHub metadata, a standard generated file name, or a generated marker in the leading comment block says so. Tests follow common TypeScript and Python test paths.'))
         this.notes.replaceChildren(...items)
     }
 
@@ -292,7 +302,10 @@ export function startCodeImpact(doc: Document, modeStore: ModeStore): CodeImpact
         }
     })
     observer.observe(doc.body, { childList: true, subtree: true })
-    const unsubscribe = modeStore.subscribe(applyMode)
+    const unsubscribe = modeStore.subscribe((next) => {
+        modeChosen = true
+        applyMode(next)
+    })
     void modeStore.get().then((stored) => {
         if (!modeChosen) {
             applyMode(stored)

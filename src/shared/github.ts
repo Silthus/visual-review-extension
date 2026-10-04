@@ -30,7 +30,7 @@ export function prKey(pr: PullRequestRef): string {
     return `${repoFullName(pr)}#${pr.number}`
 }
 
-const PR_DIFF_PATH = /^\/[^/]+\/[^/]+\/pull\/\d+\/(files|changes)(\/|$)/
+const PR_DIFF_PATH = /^\/[^/]+\/[^/]+\/pull\/\d+\/files(\/|$)/
 
 export function isPullRequestDiffUrl(url: string): boolean {
     return parsePullRequestUrl(url) !== null && PR_DIFF_PATH.test(new URL(url).pathname)

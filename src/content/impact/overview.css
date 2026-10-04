@@ -112,6 +112,17 @@ summary {
     cursor: pointer;
     color: var(--fgColor-muted, #59636e);
 }
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+details li {
+    overflow-wrap: anywhere;
+}
 details ul {
     margin: 4px 0 0;
     padding-left: 16px;

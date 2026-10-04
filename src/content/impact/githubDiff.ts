@@ -11,17 +11,24 @@ function lineCount(summary: string, word: string): number | null {
     return match ? Number(match[1]!.replace(/,/g, '')) : null
 }
 
+function codeCell(row: Element, side: 'left' | 'right'): Element | null {
+    return row.querySelector(`[data-split-side="${side}"] .blob-code-inner`) ?? row.querySelector('td:not([data-split-side]) .blob-code-inner')
+}
+
 function sideLines(table: Element, side: 'left' | 'right'): Map<number, string> {
     const lines = new Map<number, string>()
-    for (const row of table.querySelectorAll('tr[data-hunk]')) {
-        const numbers = row.querySelectorAll('td.blob-num')
-        const number = numbers[side === 'left' ? 0 : 1]?.getAttribute('data-line-number')
-        const code = row.querySelector(`[data-split-side="${side}"] .blob-code-inner`) ?? row.querySelector('td:not([data-split-side]) .blob-code-inner')
-        if (number && Number(number) > HEADER_LINES) {
+    for (const row of table.querySelectorAll('tr')) {
+        const numbers = [...row.querySelectorAll('td.blob-num')].map((cell) => Number(cell.getAttribute('data-line-number')))
+        if (numbers.some((number) => number > HEADER_LINES)) {
             break
         }
-        if (number && code) {
-            lines.set(Number(number), code.textContent ?? '')
+        const number = numbers[side === 'left' ? 0 : 1]
+        if (!number || !Number.isInteger(number)) {
+            continue
+        }
+        const code = codeCell(row, side)
+        if (code) {
+            lines.set(number, code.textContent ?? '')
         }
     }
     return lines
@@ -99,7 +106,11 @@ function asElement(node: Node): Element | null {
 
 export function isDiffChange(target: Node, changed: Node): boolean {
     const element = asElement(changed)
-    return !!asElement(target)?.closest(DIFF_REGIONS) || (!!element && (element.matches(DIFF_REGIONS) || !!element.querySelector(DIFF_REGIONS)))
+    const parent = asElement(target)
+    if (parent?.closest('.inline-comments')) {
+        return false
+    }
+    return !!parent?.closest(DIFF_REGIONS) || (!!element && (element.matches(DIFF_REGIONS) || !!element.querySelector(DIFF_REGIONS)))
 }
 
 export function placeOverview(doc: Document, host: HTMLElement): void {
