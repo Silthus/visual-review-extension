@@ -159,7 +159,10 @@ describe('code impact on the Files changed page', () => {
         expect(store.mode).toBe('hide')
         expect(doc.documentElement.getAttribute('data-vr-generated')).toBe('hide')
         expect(badge(doc, 'pnpm-lock.yaml')).toBe('Generated · hidden')
-        expect(doc.querySelector('.review-comment')?.textContent).toBe('Why did this bump?')
+        const lockfile = doc.querySelector('[data-tagsearch-path="pnpm-lock.yaml"]')!
+        expect(window.getComputedStyle(lockfile.querySelector('tr[data-hunk]')!).display).toBe('none')
+        expect(window.getComputedStyle(lockfile.querySelector('tr.inline-comments')!).display).not.toBe('none')
+        expect(window.getComputedStyle(doc.querySelector('[data-tagsearch-path="src/app.ts"] tr[data-hunk]')!).display).not.toBe('none')
     })
 
     it('follows a mode chosen in another tab', async () => {
@@ -168,6 +171,10 @@ describe('code impact on the Files changed page', () => {
         await store.set('dim')
         await settle(window)
         expect(doc.documentElement.getAttribute('data-vr-generated')).toBe('dim')
+        const generatedCell = doc.querySelector('[data-tagsearch-path="pnpm-lock.yaml"] tr[data-hunk] td')!
+        const productionCell = doc.querySelector('[data-tagsearch-path="src/app.ts"] tr[data-hunk] td')!
+        expect(window.getComputedStyle(generatedCell).opacity).toBe('0.45')
+        expect(window.getComputedStyle(productionCell).opacity).not.toBe('0.45')
         expect(overview(doc).querySelector<HTMLInputElement>('input[value="dim"]')?.checked).toBe(true)
     })
 
@@ -211,6 +218,19 @@ describe('code impact on the Files changed page', () => {
         resolveStored('show')
         await settle(window)
         expect(doc.documentElement.getAttribute('data-vr-generated')).toBe('hide')
+    })
+
+    it('ignores a stored mode that arrives after it stopped', async () => {
+        let resolveStored: (mode: GeneratedMode) => void = () => undefined
+        const store = new MemoryModeStore()
+        store.get = () => new Promise((resolve) => (resolveStored = resolve))
+        const { doc, window } = setup(FILES, undefined, store)
+        handle!.stop()
+        handle = null
+        resolveStored('hide')
+        await store.set('dim')
+        await settle(window)
+        expect(doc.documentElement.hasAttribute('data-vr-generated')).toBe(false)
     })
 
     it('does not rescan for page changes outside the diff', async () => {
