@@ -62,15 +62,15 @@ it('shows code impact on any PR diff when signed out, and cleans up after naviga
     navigate('/PostHog/posthog/pull/7/files', mockFilesChangedPage(document, [{ path: 'src/a.test.ts', additions: 2, deletions: 1, lines: ['+it()'] }]))
     await settle()
     expect(getURL).toHaveBeenCalledWith('impact.js')
-    expect(document.querySelector('[data-vr-impact-badge]')?.textContent).toBe('Test')
+    await vi.waitFor(() => expect(document.querySelector('[data-vr-impact-badge]')?.textContent).toBe('Test'))
 
     navigate('/PostHog/posthog/pull/8/files', mockFilesChangedPage(document, [{ path: 'src/b.ts', additions: 1, deletions: 0, lines: ['+b'] }]))
     await settle()
-    expect([...document.querySelectorAll('[data-vr-impact-badge]')].map((badge) => badge.textContent)).toEqual(['Production'])
+    await vi.waitFor(() => expect([...document.querySelectorAll('[data-vr-impact-badge]')].map((badge) => badge.textContent)).toEqual(['Production']))
 
     navigate('/PostHog/posthog/pull/8', null)
     await settle()
-    expect(document.getElementById('posthog-code-impact')).toBeNull()
+    await vi.waitFor(() => expect(document.getElementById('posthog-code-impact')).toBeNull())
     expect(document.getElementById('posthog-code-impact-style')).toBeNull()
     expect(document.documentElement.hasAttribute('data-vr-generated')).toBe(false)
     expect(getURL).not.toHaveBeenCalledWith('sidebar.js')

@@ -177,6 +177,8 @@ describe('code impact on the Files changed page', () => {
         const lockfile = doc.querySelector('[data-tagsearch-path="pnpm-lock.yaml"]')!
         expect(window.getComputedStyle(lockfile.querySelector('tr[data-hunk]')!).display).toBe('none')
         expect(window.getComputedStyle(lockfile.querySelector('tr.js-expandable-line')!).display).toBe('none')
+        const githubGenerated = doc.querySelector('[data-tagsearch-path="api/client.ts"] .js-diff-entry-loader')!
+        expect(window.getComputedStyle(githubGenerated).display).toBe('none')
         expect(window.getComputedStyle(lockfile.querySelector('tr.inline-comments')!).display).not.toBe('none')
         expect(window.getComputedStyle(doc.querySelector('[data-tagsearch-path="src/app.ts"] tr[data-hunk]')!).display).not.toBe('none')
     })
@@ -213,7 +215,7 @@ describe('code impact on the Files changed page', () => {
     it('picks up files GitHub loads later without rescanning for its own changes', async () => {
         const { doc, window } = setup(FILES.slice(0, 1), 2)
         await settle(window)
-        expect(overview(doc).textContent).toContain('1 file is not loaded yet')
+        expect(overview(doc).textContent).toContain('1 file is not loaded yet. Scroll to load it;')
         doc.querySelector('.js-diff-progressive-container')!.append(mockDiffFile(doc, { path: 'tests/test_api.py', additions: 4, deletions: 1, lines: ['+def test_api(): pass'] }))
         await settle(window)
         expect(row(doc, 'test')).toBe('Test 1 file +4 −1')

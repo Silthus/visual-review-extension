@@ -76,7 +76,7 @@ function completenessNotes(summary: ImpactSummary, fileCount: number): Note[] {
     if (summary.notLoadedFiles === null) {
         notes.push({ text: 'GitHub does not show the total file count here, so files it has not loaded yet may be missing.', attention: true })
     } else if (summary.notLoadedFiles > 0) {
-        notes.push({ text: `${plural(summary.notLoadedFiles, 'file is', 'files are')} not loaded yet. Scroll to load them; the counts update.`, attention: true })
+        notes.push({ text: `${plural(summary.notLoadedFiles, 'file is', 'files are')} not loaded yet. Scroll to load ${summary.notLoadedFiles === 1 ? 'it' : 'them'}; the counts update.`, attention: true })
     }
     if (summary.uncountedFiles > 0) {
         notes.push({ text: `${plural(summary.uncountedFiles, 'file has', 'files have')} no line counts, such as binary files.`, attention: true })

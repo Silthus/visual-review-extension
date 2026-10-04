@@ -24,6 +24,7 @@
 [data-vr-generated='dim'] [data-vr-impact='generated'] .diff-table > tbody > tr:not(.inline-comments) > td {
     opacity: 0.45;
 }
-[data-vr-generated='hide'] [data-vr-impact='generated'] .diff-table > tbody > tr:not(.inline-comments) {
+[data-vr-generated='hide'] [data-vr-impact='generated'] .diff-table > tbody > tr:not(.inline-comments),
+[data-vr-generated='hide'] [data-vr-impact='generated'] .js-diff-entry-loader {
     display: none;
 }
