@@ -70,17 +70,21 @@ export const HEADER_LINES = 40
 
 const GENERATED_MARKERS = [/^@generated\b/, /^Code generated .* DO NOT EDIT\.?/, /^This (file|code) (is|was) (auto-?generated|automatically generated)\b/i, /^(auto-?generated|automatically generated) (by|from|with)\b/i]
 
-const CODE_COMMENT_START = /^\s*(\/\/+|\/\*+|#+|<!--)\s*/
+const SLASH = /^\s*(\/\/+|\/\*+)\s*/
+const BLOCK_ONLY = /^\s*\/\*+\s*/
+const HASH = /^\s*#+\s*/
+const MARKUP = /^\s*<!--\s*/
+const DASH = /^\s*(--+|\/\*+)\s*/
 
-const DASH_COMMENT_START = /^\s*(--+|\/\*+)\s*/
+const COMMENT_SYNTAX: [RegExp, RegExp][] = [
+    [/\.([cm]?[jt]sx?|go|java|kts?|swift|c|h|cc|cpp|hpp|cs|rs|dart|scala|php|proto|scss|less)$/i, SLASH],
+    [/\.css$/i, BLOCK_ONLY],
+    [/(\.(py|pyi|sh|bash|zsh|rb|ya?ml|toml|r|pl|tf|graphql|gql)|(^|\/)(Dockerfile|Makefile))$/i, HASH],
+    [/\.(md|mdx|markdown|html?|xml|svg|vue|svelte)$/i, MARKUP],
+    [/\.(sql|lua|hs)$/i, DASH],
+]
 
-const BLOCK_INTERIOR_START = /^\s*(\*+|\/\/+|#+)\s*/
-
-const DASH_COMMENTS = /\.(sql|lua|hs)$/i
-
-const MARKDOWN_COMMENT_START = /^\s*<!--\s*/
-
-const MARKDOWN = /\.(md|mdx|markdown)$/i
+const BLOCK_INTERIOR_START = /^\s*\*+\s*/
 
 const BLOCK_CLOSERS: Record<string, string> = { '/*': '*/', '<!--': '-->' }
 
@@ -107,11 +111,13 @@ function openedBlock(line: string): { closer: string; closed: boolean; codeAfter
     return { closer, closed: trimmed.includes(closer, opener.length), codeAfter: hasCodeAfter(trimmed, closer, opener.length) }
 }
 
-function commentSyntax(path: string): RegExp {
-    if (MARKDOWN.test(path)) {
-        return MARKDOWN_COMMENT_START
-    }
-    return DASH_COMMENTS.test(path) ? DASH_COMMENT_START : CODE_COMMENT_START
+function commentSyntax(path: string): RegExp | null {
+    return COMMENT_SYNTAX.find(([files]) => files.test(path))?.[1] ?? null
+}
+
+function textAfter(line: string, pattern: RegExp): string {
+    const start = pattern.exec(line)
+    return start ? line.slice(start[0].length) : line.trim()
 }
 
 interface LeadingComments {
@@ -119,33 +125,32 @@ interface LeadingComments {
     complete: boolean
 }
 
-function leadingComments(fileHeader: string[], commentStart: RegExp): LeadingComments {
+function leadingComments(fileHeader: string[], commentStart: RegExp | null): LeadingComments {
     const comments: string[] = []
     let openCloser: string | null = null
-    const textOf = (line: string, pattern: RegExp) => {
-        const start = pattern.exec(line)
-        return start ? line.slice(start[0].length) : line.trim()
-    }
-    for (const line of fileHeader.slice(0, HEADER_LINES)) {
+    for (const line of commentStart ? fileHeader.slice(0, HEADER_LINES) : []) {
         if (openCloser) {
+            comments.push(textAfter(line, BLOCK_INTERIOR_START))
             if (hasCodeAfter(line, openCloser, 0)) {
                 return { comments, complete: true }
             }
-            comments.push(textOf(line, BLOCK_INTERIOR_START))
             openCloser = line.includes(openCloser) ? null : openCloser
             continue
         }
         if (line.trim() === '' || line.startsWith('#!')) {
             continue
         }
-        const block = openedBlock(line)
-        if (!commentStart.test(line) || block?.codeAfter) {
+        if (!commentStart!.test(line)) {
             return { comments, complete: true }
         }
-        comments.push(textOf(line, commentStart))
+        comments.push(textAfter(line, commentStart!))
+        const block = openedBlock(line)
+        if (block?.codeAfter) {
+            return { comments, complete: true }
+        }
         openCloser = block && !block.closed ? block.closer : null
     }
-    return { comments, complete: fileHeader.length === 0 }
+    return { comments, complete: !commentStart || fileHeader.length === 0 }
 }
 
 function hasGeneratedMarker(comments: string[]): boolean {
