@@ -70,6 +70,7 @@ describe('classifyFile', () => {
         ['src/codegen.ts', 'production', ['export function banner() {', "    return '# Code generated. DO NOT EDIT.'"]],
         ['src/notes.ts', 'production', ['export const a = 1', '// @generated files are skipped by the linter']],
         ['src/readme.py', 'production', ['"""Explains why we never ship automatically generated code."""']],
+        ['src/slug.ts', 'production', ['// Auto-generated slugs must be unique', 'export const slug = 1']],
     ])('ignores generated wording in the literals of %s', (path, category, fileHeader) => {
         expect(classifyFile(facts({ path, fileHeader })).category).toBe(category)
     })
@@ -77,8 +78,16 @@ describe('classifyFile', () => {
         expect(classifyFile(facts({ fileHeader: null }))).toMatchObject({ category: 'production', markersChecked: false })
     })
 
-    it('classifies a rename by its new path', () => {
-        expect(classifyFile(facts({ path: 'src/app.test.ts', previousPath: 'src/app.ts' })).category).toBe('test')
+    it('does not claim a header was checked when the diff cuts off its leading comment block', () => {
+        expect(classifyFile(facts({ fileHeader: ['/**', ' * Copyright PostHog', ' *'] }))).toMatchObject({ category: 'production', markersChecked: false })
+    })
+
+    it('treats a header as checked once code follows the leading comment block', () => {
+        expect(classifyFile(facts({ fileHeader: ['/**', ' * Copyright PostHog', ' */', 'export {}'] }))).toMatchObject({ markersChecked: true })
+    })
+
+    it('has nothing to check in a file without text lines', () => {
+        expect(classifyFile(facts({ fileHeader: [] }))).toMatchObject({ markersChecked: true })
     })
 })
 

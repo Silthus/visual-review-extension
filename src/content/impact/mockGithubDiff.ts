@@ -5,6 +5,7 @@ export interface MockDiffFile {
     deletions?: number
     lines?: string[]
     startLine?: number
+    split?: { left: string; right: string }[]
     githubGenerated?: boolean
     collapsed?: boolean
     deleted?: boolean
@@ -67,6 +68,26 @@ function codeRow(doc: Document, line: string, numbers: LineNumbers): HTMLElement
     return row
 }
 
+function splitCode(doc: Document, side: 'left' | 'right', text: string | undefined): HTMLElement {
+    if (text === undefined) {
+        return element(doc, 'td', { class: 'blob-code blob-code-empty empty-cell', 'data-split-side': side })
+    }
+    const code = element(doc, 'td', { class: 'blob-code js-file-line', 'data-split-side': side })
+    code.append(element(doc, 'span', { class: 'blob-code-inner blob-code-marker' }, text))
+    return code
+}
+
+function splitRow(doc: Document, line: { left: string; right: string }, number: number): HTMLElement {
+    const row = element(doc, 'tr', { 'data-hunk': 'mock' })
+    row.append(
+        lineNumber(doc, 'deletion', number),
+        splitCode(doc, 'left', line.left),
+        lineNumber(doc, 'addition', number),
+        splitCode(doc, 'right', line.right),
+    )
+    return row
+}
+
 function commentRow(doc: Document, text: string): HTMLElement {
     const row = element(doc, 'tr', { class: 'inline-comments js-inline-comments-container' })
     const cell = element(doc, 'td', { colspan: '3' })
@@ -75,14 +96,29 @@ function commentRow(doc: Document, text: string): HTMLElement {
     return row
 }
 
+function loadDiffPlaceholder(doc: Document, path: string, reason: string): HTMLElement {
+    const id = `hidden-diff-reason-${path.replace(/\W/g, '-')}`
+    const loader = element(doc, 'div', { class: 'js-diff-entry-loader' })
+    loader.append(
+        element(doc, 'button', { type: 'button', class: 'load-diff-button js-diff-load', 'aria-describedby': id }, 'Load diff'),
+        element(doc, 'p', { id, class: 'color-fg-muted f6' }, reason),
+    )
+    return loader
+}
+
+export function loadMockDiff(doc: Document, file: MockDiffFile): void {
+    const body = doc.querySelector(`[data-tagsearch-path="${file.path}"] .js-file-content`)!
+    body.replaceWith(content(doc, { ...file, githubGenerated: false, collapsed: false }))
+}
+
 function content(doc: Document, file: MockDiffFile): HTMLElement {
     const body = element(doc, 'div', { class: 'js-file-content' })
     if (file.githubGenerated) {
-        body.append(element(doc, 'div', { class: 'js-diff-load-container' }, 'Load diff Some generated files are not rendered by default.'))
+        body.append(loadDiffPlaceholder(doc, file.path, 'Some generated files are not rendered by default. Learn more about how customized files appear on GitHub.'))
         return body
     }
     if (file.collapsed) {
-        body.append(element(doc, 'div', { class: 'js-diff-load-container' }, 'Load diff Large diffs are not rendered by default.'))
+        body.append(loadDiffPlaceholder(doc, file.path, 'Large diffs are not rendered by default.'))
         return body
     }
     if (file.additions === undefined) {
@@ -95,6 +131,7 @@ function content(doc: Document, file: MockDiffFile): HTMLElement {
     for (const line of file.lines ?? []) {
         rows.append(codeRow(doc, line, numbers))
     }
+    file.split?.forEach((line, i) => rows.append(splitRow(doc, line, i + 1)))
     if (file.comment) {
         rows.append(commentRow(doc, file.comment))
     }

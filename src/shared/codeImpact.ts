@@ -4,7 +4,6 @@ export const IMPACT_CATEGORIES: ImpactCategory[] = ['production', 'test', 'gener
 
 export interface DiffFileFacts {
     path: string
-    previousPath?: string
     additions: number | null
     deletions: number | null
     githubGenerated: boolean
@@ -66,11 +65,11 @@ const TEST_PATHS = [
     /(^|\/)conftest\.py$/,
 ]
 
-const HEADER_LINES = 10
+export const HEADER_LINES = 40
 
 const COMMENT_START = /^\s*(\/\/|\/\*|\*|#|<!--|--)\s*/
 
-const GENERATED_MARKERS = [/^@generated\b/, /^Code generated .* DO NOT EDIT\.?/, /^(This file (is|was) )?(auto-?generated|automatically generated)\b/i]
+const GENERATED_MARKERS = [/^@generated\b/, /^Code generated .* DO NOT EDIT\.?/, /^This (file|code) (is|was) (auto-?generated|automatically generated)\b/i, /^(auto-?generated|automatically generated) (by|from|with)\b/i]
 
 function fileName(path: string): string {
     return path.slice(path.lastIndexOf('/') + 1)
@@ -85,7 +84,12 @@ function commentText(line: string): string | null {
     return start ? line.slice(start[0].length) : null
 }
 
-function leadingComments(fileHeader: string[]): string[] {
+interface LeadingComments {
+    comments: string[]
+    complete: boolean
+}
+
+function leadingComments(fileHeader: string[]): LeadingComments {
     const comments: string[] = []
     for (const line of fileHeader.slice(0, HEADER_LINES)) {
         if (line.trim() === '' || line.startsWith('#!')) {
@@ -93,19 +97,20 @@ function leadingComments(fileHeader: string[]): string[] {
         }
         const text = commentText(line)
         if (text === null) {
-            break
+            return { comments, complete: true }
         }
         comments.push(text)
     }
-    return comments
+    return { comments, complete: fileHeader.length === 0 }
 }
 
-function hasGeneratedHeader(fileHeader: string[]): boolean {
-    return leadingComments(fileHeader).some((text) => GENERATED_MARKERS.some((marker) => marker.test(text)))
+function hasGeneratedMarker(comments: string[]): boolean {
+    return comments.some((text) => GENERATED_MARKERS.some((marker) => marker.test(text)))
 }
 
 export function classifyFile(facts: DiffFileFacts): FileImpact {
-    const markersChecked = facts.fileHeader !== null
+    const header = facts.fileHeader === null ? null : leadingComments(facts.fileHeader)
+    const markersChecked = header?.complete ?? false
     const impact = (category: ImpactCategory, reason: string): FileImpact => ({
         path: facts.path,
         category,
@@ -120,7 +125,7 @@ export function classifyFile(facts: DiffFileFacts): FileImpact {
     if (isStandardArtifact(facts.path)) {
         return impact('generated', 'Matches a standard generated file name')
     }
-    if (facts.fileHeader && hasGeneratedHeader(facts.fileHeader)) {
+    if (header && hasGeneratedMarker(header.comments)) {
         return impact('generated', 'The file header says it is generated')
     }
     if (TEST_PATHS.some((pattern) => pattern.test(facts.path))) {
@@ -128,7 +133,7 @@ export function classifyFile(facts: DiffFileFacts): FileImpact {
     }
     return impact(
         'production',
-        markersChecked ? 'No generated or test evidence' : 'No generated or test evidence in the path; the start of the file is not shown, so its header was not checked',
+        markersChecked ? 'No generated or test evidence' : 'No generated or test evidence in the path; the diff does not show the whole leading comment block, so its header was not checked',
     )
 }
 

@@ -1,6 +1,5 @@
 // Runs on every github.com page, so it stays tiny: parse the URL, check the repo index in
 // storage, and only load the sidebar module (React + hoggies) for a PR in a tracked repo.
-// The code impact module loads on any PR's diff page, signed in or not.
 
 import { extensionBrowser } from '../shared/browser'
 import { isPullRequestDiffUrl, parsePullRequestUrl } from '../shared/github'
@@ -53,19 +52,30 @@ function unmount(): void {
 }
 
 let impact: CodeImpactHandle | null = null
+let impactPath = ''
+let impactBody: HTMLElement | null = null
+
+function stopImpact(): void {
+    impact?.stop()
+    impact = null
+    impactPath = ''
+    impactBody = null
+}
 
 async function syncImpact(id: number): Promise<void> {
     if (!isPullRequestDiffUrl(location.href)) {
-        impact?.stop()
-        impact = null
+        stopImpact()
         return
     }
-    if (impact) {
+    if (impact && impactPath === location.pathname && impactBody === document.body) {
         return
     }
     const { mountCodeImpact } = (await import(extensionBrowser().runtime.getURL('impact.js'))) as typeof import('./impact')
-    if (id === syncId && !impact) {
+    if (id === syncId) {
+        stopImpact()
         impact = mountCodeImpact()
+        impactPath = location.pathname
+        impactBody = document.body
     }
 }
 

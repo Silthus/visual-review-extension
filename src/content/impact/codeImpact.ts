@@ -6,7 +6,7 @@ import {
     type ImpactCategory,
     type ImpactSummary,
 } from '../../shared/codeImpact'
-import { expectedFileCount, placeOverview, readDiffFiles, type DiffFile } from './githubDiff'
+import { expectedFileCount, forgetGithubGenerated, isDiffChange, placeOverview, readDiffFiles, type DiffFile } from './githubDiff'
 import overviewCss from './overview.css'
 import pageCss from './page.css'
 
@@ -59,11 +59,20 @@ function setAttributeIfChanged(el: Element, name: string, value: string): void {
     }
 }
 
-function completenessNotes(summary: ImpactSummary, fileCount: number): { text: string; attention: boolean }[] {
-    if (summary.complete) {
-        return [{ text: `All ${plural(fileCount, 'changed file')} are counted.`, attention: false }]
+interface Note {
+    text: string
+    attention: boolean
+}
+
+function its(count: number): string {
+    return count === 1 ? 'its' : 'their'
+}
+
+function completenessNotes(summary: ImpactSummary, fileCount: number): Note[] {
+    const notes: Note[] = []
+    if (summary.notLoadedFiles === 0 && summary.uncountedFiles === 0) {
+        notes.push({ text: fileCount === 1 ? 'The 1 changed file is counted.' : `All ${fileCount} changed files are counted.`, attention: false })
     }
-    const notes: { text: string; attention: boolean }[] = []
     if (summary.notLoadedFiles === null) {
         notes.push({ text: 'GitHub does not show the total file count here, so files it has not loaded yet may be missing.', attention: true })
     } else if (summary.notLoadedFiles > 0) {
@@ -73,30 +82,43 @@ function completenessNotes(summary: ImpactSummary, fileCount: number): { text: s
         notes.push({ text: `${plural(summary.uncountedFiles, 'file has', 'files have')} no line counts, such as binary files.`, attention: true })
     }
     if (summary.uncheckedFiles > 0) {
-        const files = plural(summary.uncheckedFiles, 'file does', 'files do')
-        notes.push({ text: `${files} not show ${summary.uncheckedFiles === 1 ? 'its' : 'their'} first lines, so ${summary.uncheckedFiles === 1 ? 'its' : 'their'} generated header was not checked.`, attention: true })
+        const count = summary.uncheckedFiles
+        notes.push({
+            text: `${plural(count, 'file does', 'files do')} not show ${its(count)} first lines, so ${its(count)} generated header was not checked. Expand the diff to line 1 to check it.`,
+            attention: false,
+        })
     }
     return notes
 }
 
 class Overview {
     readonly host: HTMLElement
-    private readonly panel: HTMLElement
+    private readonly rows = new Map<ImpactCategory, HTMLTableRowElement>()
+    private readonly radios = new Map<GeneratedMode, HTMLInputElement>()
+    private readonly notes: HTMLUListElement
+    private readonly reasonsSummary: HTMLElement
+    private readonly reasonsList: HTMLUListElement
+    private readonly reasons: HTMLDetailsElement
     private lastRendered = ''
 
     constructor(
         private readonly doc: Document,
-        private readonly onModeChange: (mode: GeneratedMode) => void,
+        onModeChange: (mode: GeneratedMode) => void,
     ) {
         this.host = element(doc, 'section')
         this.host.id = HOST_ID
         this.host.hidden = true
         this.host.setAttribute('aria-label', 'Change impact')
-        const shadow = this.host.attachShadow({ mode: 'open' })
-        const style = element(doc, 'style', overviewCss)
-        this.panel = element(doc, 'div')
-        this.panel.className = 'panel'
-        shadow.append(style, this.panel)
+        this.notes = element(doc, 'ul')
+        this.notes.className = 'notes'
+        this.reasons = element(doc, 'details')
+        this.reasonsSummary = element(doc, 'summary')
+        this.reasonsList = element(doc, 'ul')
+        this.reasons.append(this.reasonsSummary, this.reasonsList)
+        const panel = element(doc, 'div')
+        panel.className = 'panel'
+        panel.append(this.summaryBlock(), this.modeControl(onModeChange), this.notes, this.reasons)
+        this.host.attachShadow({ mode: 'open' }).append(element(doc, 'style', overviewCss), panel)
     }
 
     render(files: FileImpact[], summary: ImpactSummary, mode: GeneratedMode): void {
@@ -106,23 +128,28 @@ class Overview {
         }
         this.lastRendered = key
         this.host.hidden = files.length === 0
-        this.panel.replaceChildren(this.summaryBlock(summary), this.modeControl(mode), this.notes(summary, files.length), this.reasons(files))
+        this.renderTotals(summary)
+        this.radios.forEach((radio, option) => {
+            radio.checked = option === mode
+        })
+        this.renderNotes(summary, files.length)
+        this.renderReasons(files)
     }
 
-    private summaryBlock(summary: ImpactSummary): HTMLElement {
+    private summaryBlock(): HTMLElement {
         const block = element(this.doc, 'div')
         const table = element(this.doc, 'table')
         table.setAttribute('aria-label', 'Lines changed by category')
         const body = element(this.doc, 'tbody')
         for (const category of IMPACT_CATEGORIES) {
-            const totals = summary.totals[category]
             const row = element(this.doc, 'tr')
             row.dataset.category = category
-            const added = element(this.doc, 'td', `+${totals.additions}`)
+            const added = element(this.doc, 'td')
             added.className = 'added'
-            const deleted = element(this.doc, 'td', `−${totals.deletions}`)
+            const deleted = element(this.doc, 'td')
             deleted.className = 'deleted'
-            row.append(element(this.doc, 'th', CATEGORY_LABELS[category]), element(this.doc, 'td', plural(totals.files, 'file')), added, deleted)
+            row.append(element(this.doc, 'th', CATEGORY_LABELS[category]), element(this.doc, 'td'), added, deleted)
+            this.rows.set(category, row)
             body.append(row)
         }
         table.append(body)
@@ -130,7 +157,7 @@ class Overview {
         return block
     }
 
-    private modeControl(mode: GeneratedMode): HTMLElement {
+    private modeControl(onModeChange: (mode: GeneratedMode) => void): HTMLElement {
         const fieldset = element(this.doc, 'fieldset')
         fieldset.append(element(this.doc, 'legend', 'Generated lines'))
         const segments = element(this.doc, 'div')
@@ -141,8 +168,8 @@ class Overview {
             input.type = 'radio'
             input.name = 'generated-mode'
             input.value = option
-            input.checked = option === mode
-            input.addEventListener('change', () => this.onModeChange(option))
+            input.addEventListener('change', () => onModeChange(option))
+            this.radios.set(option, input)
             label.append(input, MODE_LABELS[option])
             segments.append(label)
         }
@@ -150,33 +177,39 @@ class Overview {
         return fieldset
     }
 
-    private notes(summary: ImpactSummary, fileCount: number): HTMLElement {
-        const list = element(this.doc, 'ul')
-        list.className = 'notes'
-        for (const note of completenessNotes(summary, fileCount)) {
+    private renderTotals(summary: ImpactSummary): void {
+        for (const [category, row] of this.rows) {
+            const totals = summary.totals[category]
+            const [, files, added, deleted] = row.children
+            files!.textContent = plural(totals.files, 'file')
+            added!.textContent = `+${totals.additions}`
+            deleted!.textContent = `−${totals.deletions}`
+        }
+    }
+
+    private renderNotes(summary: ImpactSummary, fileCount: number): void {
+        const items = completenessNotes(summary, fileCount).map((note) => {
             const item = element(this.doc, 'li', note.text)
             if (note.attention) {
                 item.dataset.tone = 'attention'
             }
-            list.append(item)
-        }
-        list.append(element(this.doc, 'li', 'Generated means GitHub metadata, a standard generated file name, or a generated header comment says so. Tests follow common TypeScript and Python test paths.'))
-        return list
+            return item
+        })
+        items.push(element(this.doc, 'li', 'Generated means GitHub metadata, a standard generated file name, or a generated header comment says so. Tests follow common TypeScript and Python test paths.'))
+        this.notes.replaceChildren(...items)
     }
 
-    private reasons(files: FileImpact[]): HTMLElement {
-        const details = element(this.doc, 'details')
+    private renderReasons(files: FileImpact[]): void {
         const flagged = files.filter((file) => file.category !== 'production')
-        details.append(element(this.doc, 'summary', `Why ${plural(flagged.length, 'file is', 'files are')} not production`))
-        const list = element(this.doc, 'ul')
-        for (const file of flagged) {
-            const item = element(this.doc, 'li')
-            item.append(element(this.doc, 'code', file.path), ` · ${CATEGORY_LABELS[file.category]}: ${file.reason}`)
-            list.append(item)
-        }
-        details.append(list)
-        details.hidden = flagged.length === 0
-        return details
+        this.reasonsSummary.textContent = `Why ${plural(flagged.length, 'file is', 'files are')} not production`
+        this.reasonsList.replaceChildren(
+            ...flagged.map((file) => {
+                const item = element(this.doc, 'li')
+                item.append(element(this.doc, 'code', file.path), ` · ${CATEGORY_LABELS[file.category]}: ${file.reason}`)
+                return item
+            }),
+        )
+        this.reasons.hidden = flagged.length === 0
     }
 }
 
@@ -186,10 +219,12 @@ export function startCodeImpact(doc: Document, modeStore: ModeStore): CodeImpact
     let scans = 0
     let scheduled = false
     let stopped = false
+    let modeChosen = false
     const style = element(doc, 'style', pageCss)
     style.id = STYLE_ID
     doc.head.append(style)
     const overview = new Overview(doc, (next) => {
+        modeChosen = true
         applyMode(next)
         void modeStore.set(next)
     })
@@ -238,6 +273,9 @@ export function startCodeImpact(doc: Document, modeStore: ModeStore): CodeImpact
     }
 
     function applyMode(next: GeneratedMode): void {
+        if (stopped) {
+            return
+        }
         mode = next
         setAttributeIfChanged(doc.documentElement, MODE_ATTRIBUTE, next)
         schedule()
@@ -245,7 +283,9 @@ export function startCodeImpact(doc: Document, modeStore: ModeStore): CodeImpact
 
     const observer = new view.MutationObserver((mutations) => {
         const external = mutations.some(
-            (mutation) => !isOwnNode(mutation.target) && [...mutation.addedNodes, ...mutation.removedNodes].some((node) => !isOwnNode(node)),
+            (mutation) =>
+                !isOwnNode(mutation.target) &&
+                [...mutation.addedNodes, ...mutation.removedNodes].some((node) => !isOwnNode(node) && isDiffChange(mutation.target, node)),
         )
         if (external) {
             schedule()
@@ -254,7 +294,7 @@ export function startCodeImpact(doc: Document, modeStore: ModeStore): CodeImpact
     observer.observe(doc.body, { childList: true, subtree: true })
     const unsubscribe = modeStore.subscribe(applyMode)
     void modeStore.get().then((stored) => {
-        if (!stopped) {
+        if (!modeChosen) {
             applyMode(stored)
         }
     })
@@ -273,6 +313,7 @@ export function startCodeImpact(doc: Document, modeStore: ModeStore): CodeImpact
             doc.documentElement.removeAttribute(MODE_ATTRIBUTE)
             doc.querySelectorAll(`[${BADGE_ATTRIBUTE}]`).forEach((badge) => badge.remove())
             doc.querySelectorAll(`[${CATEGORY_ATTRIBUTE}]`).forEach((file) => file.removeAttribute(CATEGORY_ATTRIBUTE))
+            forgetGithubGenerated(doc)
         },
     }
 }
